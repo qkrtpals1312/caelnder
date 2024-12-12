@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>날짜 기록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex justify-center items-center h-screen bg-gray-100">
+    <div class="container w-full max-w-lg bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-center mb-4">날짜 기록</h1>
+        <p id="selected-date" class="text-center text-gray-600 mb-6"></p>
+
+        <label for="diary" class="block text-lg font-medium mb-2">한 줄 일기:</label>
+        <textarea id="diary" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4" placeholder="오늘 하루를 기록하세요"></textarea>
+
+        <label for="mood" class="block text-lg font-medium mb-2">오늘 기분:</label>
+        <select id="mood" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6">
+            <option value="😊">😊 기분 좋아요</option>
+            <option value="😢">😢 슬퍼요</option>
+            <option value="😠">😠 화나요</option>
+            <option value="😴">😴 졸려요</option>
+            <option value="😍">😍 사랑스러워요</option>
+        </select>
+
+        <label class="block text-lg font-medium mb-2">체크리스트:</label>
+        <ul id="checklist" class="list-none mb-4"></ul>
+        <button onclick="addChecklistItem()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-700 mb-4">체크리스트 항목 추가</button>
+
+        <button onclick="saveData()" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700">저장</button>
+    </div>
+
+    <script>
+        // URL에서 날짜 정보를 가져옴
+        const params = new URLSearchParams(window.location.search);
+        const date = params.get('date');
+        document.getElementById('selected-date').innerText = date
+            ? `선택한 날짜: ${date}`
+            : '날짜 정보가 없습니다.';
+
+        // 서버에서 기존 데이터를 로드하는 기능
+        async function loadData() {
+            try {
+                const response = await fetch(`http://localhost:5000/api/calendar/${date}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        document.getElementById('diary').value = data.entry.diary || '';
+                        document.getElementById('mood').value = data.entry.mood || '😊';
+                        const checklist = data.entry.checklist || [];
+                        checklist.forEach(item => addChecklistItem(item.text, item.checked));
+                    }
+                } else {
+                    console.log('기록 없음 또는 서버 응답 오류');
+                }
+            } catch (err) {
+                console.error('데이터 로드 실패:', err);
+            }
+        }
+
+        // 체크리스트 항목 추가 기능
+        function addChecklistItem(text = '', checked = false) {
+            const checklist = document.getElementById('checklist');
+            const newItem = document.createElement('li');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.classList.add('mr-2');
+            checkbox.checked = checked;
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.value = text;
+            textInput.placeholder = '할 일을 입력하세요';
+            textInput.classList.add('border', 'rounded-lg', 'p-2', 'flex-1', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500');
+
+            newItem.classList.add('flex', 'items-center', 'mb-2');
+            newItem.appendChild(checkbox);
+            newItem.appendChild(textInput);
+            checklist.appendChild(newItem);
+        }
+
+        // 데이터 저장 기능
+        async function saveData() {
+            const diary = document.getElementById('diary').value; // 한 줄 일기 내용
+            const mood = document.getElementById('mood').value;   // 오늘 기분
+            const checklist = document.getElementById('checklist').children; // 체크리스트
+
+            const checklistData = Array.from(checklist).map(item => ({
+                checked: item.querySelector('input[type="checkbox"]').checked,
+                text: item.querySelector('input[type="text"]').value,
+            }));
+
+            const data = {
+                date,
+                diary,
+                mood,
+                checklist: checklistData
+            };
+
+            try {
+                const response = await fetch('http://localhost:5000/api/calendar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (response.ok) {
+                    alert('데이터가 성공적으로 저장되었습니다!');
+                    window.location.href = 'index.html'; // 저장 후 index로 이동
+                } else {
+                    const error = await response.json();
+                    alert(`오류 발생: ${error.message}`);
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('서버 연결 실패. 다시 시도해주세요.');
+            }
+        }
+
+        // 초기 데이터 로드
+        loadData();
+    </script>
+</body>
+</html>
